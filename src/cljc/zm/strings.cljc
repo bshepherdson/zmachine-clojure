@@ -24,7 +24,7 @@
 
 
 (defn- emit [st real-char]
-  (update st :output conj real-char))
+  (update st :output conj (char real-char)))
 
 (defn- dequeue [st]
   "Pops a zchar from the queue and returns [st' zc]."
@@ -56,16 +56,16 @@
 (defn- shift  [st zc] (assoc st :shift zc))
 (defn- abbrev [st zc] (assoc st :abbrev zc))
 
-(defn- a0 [st zc] (emit st (+ \a (- zc 6))))
-(defn- a1 [st zc] (emit st (+ \A (- zc 6))))
+(defn- a0 [st zc] (emit st (+ (int \a) (- zc 6))))
+(defn- a1 [st zc] (emit st (+ (int \A) (- zc 6))))
 
-(def a2-chars "0123456789.,!?_#'\"/\\<-:()")
+(def a2-chars "0123456789.,!?_#'\"/\\-:()")
 
 (defn- a2 [st zc]
   (case zc
     6 (assoc st :literal 0 :literal-stage 1)
-    7 \newline
-    (emit (nth a2-chars (- zc 8)))))
+    7 (emit st \newline)
+    (emit st (nth a2-chars (- zc 8)))))
 
 (defn- regular [st zc]
   (let [st' (case (:shift st)
@@ -90,13 +90,13 @@
         addr   (+ table (* 2 index))
         word-addr (rw zm addr)
         s (print-ra zm (wa word-addr))]
-    (reduce emit st s)))
+    (reduce emit (assoc st :abbrev nil) s)))
 
 
 (defn- handle-char [st zc]
   (cond
     (> (:literal-stage st) 0) (handle-literal st zc)
-    (> (:abbrev st) 0)        (handle-abbrev st zc)
+    (not (nil? (:abbrev st))) (handle-abbrev st zc)
     :else (case zc
             0 (emit st \space)
             1 (abbrev st 1)
@@ -113,5 +113,3 @@
         (apply str (:output st'))
         (recur (handle-char st' zc))))))
 
-; START HERE: Mock up a story file and test the strings.
-; Maybe some tests for the basics.
