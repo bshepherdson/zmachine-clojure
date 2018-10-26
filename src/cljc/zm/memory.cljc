@@ -30,8 +30,11 @@
 ;; Readers return the value, not the Z-machine state.
 ;; Writers and modifiers return the new state.
 (defn rb [zm addr]
-  (get-in (:mem zm) [addr]
-          (bit-and 255 (int (nth (:rom zm) addr)))))
+  (let [b (get-in zm [:mem addr] nil)]
+    (if b
+      b
+      (bit-and 255 (int (nth (:rom zm) addr))))))
+
 (defn rw [zm addr]
   (let [hi (rb zm addr)
         lo (rb zm (inc addr))]
@@ -51,6 +54,27 @@
 (defn mw [zm addr f]
   (let [w (rw zm addr)]
     (ww zm addr (f w))))
+
+
+;; Manipulating at PC.
+(defn pc+ [zm delta]
+  (update zm :pc + delta))
+(defn pc++ [zm] (pc+ zm 1))
+
+;; These return value only.
+(defn rbpc [zm]
+  (rb zm (:pc zm)))
+(defn rwpc [zm]
+  (rw zm (:pc zm)))
+
+;; Bump the PC by the amount read.
+;; These return [zm value].
+(defn rbpc+ [zm]
+  [(pc++ zm)
+   (rbpc zm)])
+(defn rwpc+ [zm]
+  [(pc+ zm 2)
+   (rwpc zm)])
 
 
 ;; Header accessors
