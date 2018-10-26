@@ -93,3 +93,84 @@
       (test-branch zm-rtrue-positive false -1)
       (test-branch zm-rfalse-positive true   0)
       (test-branch zm-rfalse-positive false -1))))
+
+
+(deftest test-zreturn
+  ; With return value.
+  (let [zm (atom (-> (q/basics 5)
+                     (q/cb 24) ; Spot to return to.
+                     (assoc :pc 0x4400
+                            :frame {:return-expected? true
+                                    :chain 17
+                                    :old-pc 0x4000})))]
+    (is (= 0x4400 (:pc @zm)))
+    (swap! zm sut/zreturn 200)
+    (is (= 0x4001 (:pc @zm)))
+    (is (= 17 (:frame @zm)))
+    (is (= 200
+           (v/rglobal @zm 24))))
+
+  ; No return value.
+  (let [zm (atom (-> (q/basics 5)
+                     (q/cb 24) ; Spot to return to.
+                     (v/wglobal 24 100)
+                     (assoc :pc 0x4400
+                            :frame {:return-expected? false
+                                    :chain 17
+                                    :old-pc 0x4000})))]
+    (is (= 0x4400 (:pc @zm)))
+    (swap! zm sut/zreturn 200)
+    (is (= 0x4000 (:pc @zm)))
+    (is (= 17 (:frame @zm)))
+    (is (= 100
+           (v/rglobal @zm 24)))))
+
+(deftest test-zcall
+  (let [base (-> (q/basics 5)
+                 (q/cb 3) ; 3 locals
+                 (assoc :pc 0x4400 ; old PC
+                        :frame 17))
+        zm   (atom base)]
+    ; Call with fewer args than locals.
+    (swap! zm sut/zcall 0x4000 [1 2] true)
+    (is (= 0x4001 (:pc @zm)))
+    (is (= (:frame @zm)
+           {:old-pc 0x4400
+            :return-expected? true
+            :chain 17
+            :locals [1 2 0]
+            :stack []
+            :arg-count 2}))
+    (reset! zm base)
+
+    ; Call with more args than locals.
+    (swap! zm sut/zcall 0x4000 [1 2 3 4] false)
+    (is (= 0x4001 (:pc @zm)))
+    (is (= (:frame @zm)
+           {:old-pc 0x4400
+            :return-expected? false
+            :chain 17
+            :locals [1 2 3]
+            :stack []
+            :arg-count 4}))
+    (reset! zm base))
+
+  ; v4 has defaults
+  (let [zm (atom (-> (q/basics 4)
+                     (q/cb 3) ; 3 locals
+                     (q/cw 21)
+                     (q/cw 22)
+                     (q/cw 23)
+                     (assoc :pc 0x4400 ; old PC
+                            :frame 17)))]
+    ; Call with fewer args than locals.
+    (swap! zm sut/zcall 0x4000 [1] true)
+    (is (= 0x4007 (:pc @zm)))
+    (is (= (:frame @zm)
+           {:old-pc 0x4400
+            :return-expected? true
+            :chain 17
+            :locals [1 22 23]
+            :stack []
+            :arg-count 1}))))
+
