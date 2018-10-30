@@ -2,6 +2,7 @@
   "I contain 'helper' functions for routine calls and returns, branching, etc."
   (:require [zm.memory :refer :all]
             [zm.variables :as v]
+            [zm.printing :as p]
             [zm.util :refer [bit-slice]]))
 
 (defn signed
@@ -15,6 +16,9 @@
      (if neg?
        (- value base)
        value))))
+
+(defn illegal-opcode [zm msg]
+  (p/println (str "[Illegal opcode: " msg "]")))
 
 
 (defn zstore [zm value]

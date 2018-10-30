@@ -1,6 +1,7 @@
 (ns zm.fixtures.quick-story
   "Helpers for building a quick, fake story file for testing."
-  (:require [zm.memory :refer :all]))
+  (:require [zm.memory :refer :all]
+            [zm.objects :as o]))
 
 ;; The tricky bit here is supporting the memory: we want to allow it to be
 ;; written easily.
@@ -40,10 +41,32 @@
 (defn compile [zm bytes]
   (reduce cb zm bytes))
 
+(defn object [zm number details]
+  (let [parent  (:parent  details 0)
+        child   (:child   details 0)
+        sibling (:sibling details 0)
+        props   (:props   details 0)
+        addr    (object zm number)]
+    (-> zm
+        (wb      addr  0)
+        (wb (+ 1 addr) 0)
+        (wb (+ 2 addr) 0)
+        (wb (+ 3 addr) 0)
+        (wb (+ 4 addr) 0)
+        (wb (+ 5 addr) 0)
+        (o/wparent  addr parent)
+        (o/wsibling addr sibling)
+        (o/wchild   addr child)
+        (ww (+ addr (if (<= (:version zm) 3)
+                      7
+                      12))
+            props))))
+
 (defn for-result [atom-zm f & rest]
   "Applies the given function and arguments to the Z-machine.
   Expects [zm' value] back; updates the atom and returns the value."
   (let [[zm' value] (apply f @atom-zm rest)]
     (reset! atom-zm zm')
     value))
+
 

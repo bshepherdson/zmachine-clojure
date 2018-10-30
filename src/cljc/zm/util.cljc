@@ -6,6 +6,11 @@
        ~lo
        ~hi))
 
+(defmacro v4-5 [zm lo hi]
+  `(if (<= (:version ~zm) 4)
+       ~lo
+       ~hi))
+
 (defn bit-slice [value base width]
   (let [mask (- (bit-shift-left 1 width) 1)]
     (bit-and mask (bit-shift-right value base))))

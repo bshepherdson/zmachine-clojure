@@ -39,13 +39,11 @@
   If it's $$11 then it's a 0OP; otherwise 1OP.
   Opcode number is bottom four bits."
   (let [opnum (bit-slice opcode 0 4)
-        type  (bit-slice opcode 4 2)
-        [zm arg] (if (= type 3)
-                   [zm nil]
-                   (operand-by-type zm type))]
+        type  (bit-slice opcode 4 2)]
     (if (= type 3)
       (ops0OP/run zm opnum)
-      (ops1OP/run zm opnum arg))))
+      (let [[zm arg] (operand-by-type zm type)]
+        (ops1OP/run zm opnum arg)))))
 
 
 (defn- decode-long-arg [zm bit]

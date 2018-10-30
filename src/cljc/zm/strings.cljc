@@ -2,7 +2,7 @@
   (:require [zm.header :as hdr]
             [zm.memory :refer :all]))
 
-(declare print-ra)
+(declare read-ra)
 
 (defn- decode-word [w]
   "Returns [end? a b c]."
@@ -89,7 +89,7 @@
         index  (+ zc (* 32 (dec (:abbrev st))))
         addr   (+ table (* 2 index))
         word-addr (rw zm addr)
-        s (print-ra zm (wa word-addr))]
+        s (read-ra zm (wa word-addr))]
     (reduce emit (assoc st :abbrev nil) s)))
 
 
@@ -106,10 +106,19 @@
             5 (shift  st 2)
             (regular st zc))))
 
-(defn print-ra [zm ra]
+(defn read-ra [zm ra]
+  "Returns the string at a real address and returns the Clojure string."
   (loop [st (build-str-state zm ra)]
     (let [[st' zc] (step st)]
       (if (nil? zc)
         (apply str (:output st'))
         (recur (handle-char st' zc))))))
+
+(defn length-words [zm ra]
+  "Returns the length in words of this string in memory."
+  (loop [addr ra
+         len  0]
+    (if (bit-test (rw zm addr) 15)
+      (inc len)
+      (recur (+ 2 addr) (inc len)))))
 

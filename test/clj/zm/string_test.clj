@@ -4,7 +4,7 @@
             [zm.fixtures.zork :refer [zork]]))
 
 (defn test-read [addr s]
-  (is (= s (sut/print-ra (zork) addr))))
+  (is (= s (sut/read-ra (zork) addr))))
 
 (deftest test-simple-read
   (test-read 0x1938c "How silly!"))

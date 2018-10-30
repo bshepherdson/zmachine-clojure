@@ -5,4 +5,5 @@
 out
 games/**/*.asm
 games/**/*.hex
+games/**/*.info
 .lein-repl-history
