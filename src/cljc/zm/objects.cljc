@@ -9,7 +9,7 @@
 (defn- object-table [zm]
   (rw zm hdr/*object-table))
 
-(defn- property-default [zm prop]
+(defn property-default [zm prop]
   "Returns the default property value for the given property."
   (rw zm (+ (object-table zm)
             (* 2 (dec prop)))))
@@ -106,6 +106,17 @@
       ; I'm a sibling.
       :else (remove-obj-elder-sibling zm num *obj *p))))
 
+(defn insert-obj [zm num dest-num]
+  "Removes object num from the tree, then makes it the first child of dest."
+  (let [*obj    (object zm num)
+        *dest   (object zm dest-num)
+        child   (rchild zm *dest)]
+    (-> zm
+        (remove-obj num)
+        (wsibling *obj  child)
+        (wparent  *obj  dest-num)
+        (wchild   *dest num))))
+
 
 ;; Working with properties.
 (defn prop-table [zm *obj]
@@ -164,4 +175,49 @@
             (if (bit-test b 6)
               2
               1)))))
+
+
+(defn prop-number [zm *prop]
+  "Returns the property number given a property header.
+  It's either the bottom 5 or 6 bits of the first header byte."
+  (bit-slice (rb zm *prop) 0 (v3-5 zm 5 6)))
+
+
+(defn next-prop [zm *prop]
+  "Given the address of a prop header, returns that of the next prop."
+  (+ (prop->data zm *prop)
+     (prop-len zm *prop)))
+
+(defn find-prop [zm *obj num]
+  "Returns *prop if the property with that number is found, and nil if not."
+  (loop [*prop (first-prop zm *obj)]
+    (let [pnum (prop-number zm *prop)]
+      (println "Checking" *prop pnum num)
+      (cond
+        (= pnum num) *prop
+        (< pnum num) nil  ; They're in descending order, so if we find one
+                          ; smaller than the target, we're done.
+        :else (recur (next-prop zm *prop))))))
+
+
+;; Attributes
+; Attributes are in 4 or 6 leading bytes. They're numbered from 0, left to
+; right.
+
+(defn- attr-byte [attr] (bit-shift-right attr 3))
+(defn- attr-bit  [attr] (- 7 (bit-and 7 attr)))
+
+(defn test-attr [zm *obj attr]
+  (let [b (rb zm (+ *obj (attr-byte attr)))]
+    (bit-test b (attr-bit attr))))
+
+(defn set-attr [zm *obj attr]
+  (let [*b (+ *obj (attr-byte attr))
+        b  (rb zm *b)]
+    (wb zm *b (bit-set b (attr-bit attr)))))
+
+(defn clear-attr [zm *obj attr]
+  (let [*b (+ *obj (attr-byte attr))
+        b  (rb zm *b)]
+    (wb zm *b (bit-clear b (attr-bit attr)))))
 

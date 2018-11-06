@@ -137,3 +137,56 @@
     (is (= 0 (sut/rsibling @zm (sut/object @zm 100)))
         "My sibling should now be 0."))
   )
+
+(deftest test-attributes
+  (let [zm   (atom (zork))
+        *obj (sut/object @zm 100)]
+    ; Object 100 has attributes 33 and 44.
+    (is (sut/test-attr @zm *obj 33))
+    (is (sut/test-attr @zm *obj 44))
+    ; But not 21
+    (is (not (sut/test-attr @zm *obj 21)))
+    ; So let's add 21.
+    (swap! zm sut/set-attr *obj 21)
+    (is (sut/test-attr @zm *obj 21))
+
+    ; And if we remove 33, it's gone.
+    (swap! zm sut/clear-attr *obj 33)
+    (is (not (sut/test-attr @zm *obj 33)))
+    ))
+
+(deftest test-insert-obj
+  ; Object 79 ("Living Room") has child 9 ("nail").
+  ; We remove 24 ("crystal trident") from the tree, then add it to 79.
+  (let [zm (atom (zork))]
+    (swap! zm sut/remove-obj 24)
+    (is (= 0 (sut/rparent @zm (sut/object @zm 24)))
+        "After removal, #24's parent is 0")
+    (is (= 9 (sut/rchild  @zm (sut/object @zm 79)))
+        "Before the insert, the child of #79 is 9.")
+    (swap! zm sut/insert-obj 24 79)
+    (is (= 24 (sut/rchild   @zm (sut/object @zm 79)))
+        "After the insert, the child of #79 is 24.")
+    (is (= 9  (sut/rsibling @zm (sut/object @zm 24)))
+        "The sibling of #24 is the old direct child, 9.")
+    (is (= 79 (sut/rparent  @zm (sut/object @zm 24)))
+        "And the parent of #24 is 79.")
+    ))
+
+(deftest test-find-prop
+  ; Object 79 has properties 62, 61, 54, 45 and 37.
+  (let [zm (zork)]
+    (is (sut/find-prop zm (sut/object zm 79) 62))
+    (is (sut/find-prop zm (sut/object zm 79) 61))
+    (is (sut/find-prop zm (sut/object zm 79) 54))
+    (is (sut/find-prop zm (sut/object zm 79) 45))
+    (is (sut/find-prop zm (sut/object zm 79) 37))
+    (is (nil? (sut/find-prop zm (sut/object zm 79) 30)))
+    ))
+
+(deftest test-prop-value
+  (let [zm (zork)]
+    (is (sut/find-prop zm (sut/object zm 79) 45))
+    (is (= 0x3056 (rw zm (sut/prop->data zm
+                           (sut/find-prop zm (sut/object zm 79) 45)))))
+    ))

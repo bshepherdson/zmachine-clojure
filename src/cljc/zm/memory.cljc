@@ -76,6 +76,15 @@
   [(pc+ zm 2)
    (rwpc zm)])
 
+;; Reading a sequence.
+(defn rb-width [zm addr width]
+  "Reads width bytes from addr and returns them as a sequence."
+  (take width (map #(rb zm %) (iterate inc addr))))
+
+(defn rw-width [zm addr width]
+  "Reads width words from addr and returns them as a sequence."
+  (take width (map #(rw zm %) (iterate #(+ 2 %) addr))))
+
 
 ;; Header accessors
 (defn version [zm]         (rb zm hdr/*version))
