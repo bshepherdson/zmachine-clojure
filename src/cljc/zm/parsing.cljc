@@ -89,7 +89,7 @@
   "Given the address of the dictionary (that is, its header) build a structure
   of details about it."
   (let [separator-count (rb zm dict)
-        separators      (rb-width zm (inc dict) separator-count)
+        separators      (into #{} (rb-width zm (inc dict) separator-count))
         *entry-length   (+ dict 1 separator-count)
         entry-length    (rb zm *entry-length)
         entry-count     (rw zm (inc *entry-length))
@@ -116,6 +116,52 @@
              %
              nil)
           (:words dict-header))))
+
+
+(defn- ->str [zm text start end]
+  (let [len (- end start)
+        cs  (rb-width zm (+ text start) len)]
+    (apply str (map char cs))))
+
+(defn- find-start [zm text i len]
+  "Finds the index of the next non-space letter (or the length, if at end)."
+  (if (>= i len)
+    len
+    (let [c (rb zm (+ text i))]
+      (if (= 32 c)
+        (recur zm text (inc i) len)
+        i))))
+
+(defn- find-end [zm dict-header text i len]
+  "Finds the index of the next space, separator or the index of the end."
+  (if (>= i len)
+    len
+    (let [c (rb zm (+ text i))]
+      (if (or (= 32 c)
+              ((:separators dict-header) c))
+        i
+        (recur zm dict-header text (inc i) len)))))
+
+(defn- separate-words [zm dict-header text len]
+  "Given the text buffer, pull the words from it as a sequence of
+  {:text \"Clojure string\"
+   :start index-into-buffer
+   :length len}"
+  (loop [i     0
+         ws    []]
+    (let [start (find-start zm text i len)
+          end   (find-end zm dict-header text start len)]
+      (cond
+        (= start len) ws ; Reached end.
+        ; Found separator.
+        (= start end) (recur (inc end) (conj ws {:start start
+                                                 :length 1
+                                                 :text   (->str zm text start (inc start))}))
+
+        ; Found a regular word.
+        :else (recur end (conj ws {:start start
+                                   :length (- end start)
+                                   :text   (->str zm text start end)}))))))
 
 
 (defn parse-text-dict [zm s parse dict]

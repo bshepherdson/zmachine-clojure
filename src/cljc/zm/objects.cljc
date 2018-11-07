@@ -192,7 +192,6 @@
   "Returns *prop if the property with that number is found, and nil if not."
   (loop [*prop (first-prop zm *obj)]
     (let [pnum (prop-number zm *prop)]
-      (println "Checking" *prop pnum num)
       (cond
         (= pnum num) *prop
         (< pnum num) nil  ; They're in descending order, so if we find one

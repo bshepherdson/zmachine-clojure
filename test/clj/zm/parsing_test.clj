@@ -24,3 +24,26 @@
     (is (= (entry 3)   (#'sut/lookup-word zm dh ",")))
     (is (= (entry 8)   (#'sut/lookup-word zm dh "\"")))
     ))
+
+(deftest test-separate-words
+  "Splits text into its various parts."
+  (let [sep (fn [s ws]
+              (let [zm {:rom (into [] (map int s))
+                        :version 5}
+                    dict {:header 0
+                          :separators (into #{} (map int ",.\""))}
+                    ws' (#'sut/separate-words zm dict 0 (count s))]
+                (is (= ws ws'))))]
+    (sep "   fred  ,turn left"
+         [{:start 3  :length 4 :text "fred"}
+          {:start 9  :length 1 :text ","}
+          {:start 10 :length 4 :text "turn"}
+          {:start 15 :length 4 :text "left"}])
+    (sep "get all   except \"that\""
+         [{:start 0  :length 3 :text "get"}
+          {:start 4  :length 3 :text "all"}
+          {:start 10 :length 6 :text "except"}
+          {:start 17 :length 1 :text "\""}
+          {:start 18 :length 4 :text "that"}
+          {:start 22 :length 1 :text "\""}])
+    ))
