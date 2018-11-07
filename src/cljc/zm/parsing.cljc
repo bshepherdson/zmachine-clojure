@@ -1,9 +1,9 @@
 (ns zm.parsing
   "Parsing and lexical analysis of user input."
-  #?(:cljs (:require-macros [zm.util :refer [v4-5]]))
+  #?(:cljs (:require-macros [zm.util :refer [v3-5 v4-5]]))
   (:require [zm.memory :refer :all]
             [zm.header :as hdr]
-            #?(:clj [zm.util :refer [v3-5]])))
+            #?(:clj [zm.util :refer [v3-5 v4-5]])))
 
 (defn- standard-dictionary [zm]
   (rw zm hdr/*dictionary))
@@ -65,7 +65,7 @@
          zchars     []]
     (let [zcs (encoded-symbols c)
           out (concat zchars zcs)]
-      (when (not zcs) (throw (Exception. (str "Unknown input character: " c))))
+      (when (not zcs) (throw (Exception. (str "Unknown input character: '" c "'"))))
       (if rest
         (recur rest out)
         out))))
@@ -164,11 +164,33 @@
                                    :text   (->str zm text start end)}))))))
 
 
-(defn parse-text-dict [zm s parse dict]
-  nil)
+(defn- parse-entry [zm parse dict-header word]
+  "Given an address into the parse buffer, and the word (as a map from
+  separate-words), build its entry in the parse buffer.
+  Each entry consists of:
+  1. the byte address of the word in the dictionary, or 0 if it's not found.
+  2. the number of letters in the word (a byte)
+  3. start position (a byte)"
+  (let [extra-text (v4-5 zm 1 2) ; Extra byte or two for the length.
+        entry      (or (lookup-word zm dict-header (:text word))
+                       0)]
+    (-> zm
+        (ww parse entry)
+        (wb (+ 2 parse) (:length word))
+        (wb (+ 3 parse) (+ extra-text (:start word))))))
 
-(defn parse-text [zm s parse]
+
+(defn parse-text-dict [zm text len parse dict]
+  (let [dict-header (dictionary-header zm dict)
+        words       (separate-words zm dict-header text len)
+        zm (reduce-kv #(parse-entry %1 (+ 2 (* 4 %2) parse) dict-header %3)
+                      zm
+                      words)]
+    (wb zm (inc parse) (count words))))
+
+
+(defn parse-text [zm text len parse]
   "Given the text s and parse-buffer address parse, parse the text against the
   default dictionary."
-  (parse-text-dict zm s parse (standard-dictionary zm)))
+  (parse-text-dict zm text len parse (standard-dictionary zm)))
 

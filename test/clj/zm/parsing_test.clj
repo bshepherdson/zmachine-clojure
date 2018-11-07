@@ -47,3 +47,34 @@
           {:start 18 :length 4 :text "that"}
           {:start 22 :length 1 :text "\""}])
     ))
+
+(deftest test-parse-text-dict
+  (let [zm (atom (-> (zork)
+                     (wb 0xd000 12) ; length
+                     (wb 0xd002 (int \t))
+                     (wb 0xd003 (int \a))
+                     (wb 0xd004 (int \k))
+                     (wb 0xd005 (int \e))
+                     (wb 0xd006 (int \space))
+                     (wb 0xd007 (int \a))
+                     (wb 0xd008 (int \l))
+                     (wb 0xd009 (int \l))
+                     (wb 0xd00a (int \space))
+                     (wb 0xd00b (int \j))
+                     (wb 0xd00c (int \k))
+                     (wb 0xd00d (int \l))))
+        entry (fn [n] (+ 0x4805
+                         (* (dec n) 9)))]
+    (swap! zm #'sut/parse-text 0xd002 12 0xd010)
+    (is (= 3 (rb @zm 0xd011))
+        "Length in words should be recorded")
+    (is (= (entry 590) (rw @zm 0xd012)))
+    (is (= 4           (rb @zm 0xd014)))
+    (is (= 2           (rb @zm 0xd015)))
+    (is (= (entry 18)  (rw @zm 0xd016)))
+    (is (= 3           (rb @zm 0xd018)))
+    (is (= 7           (rb @zm 0xd019)))
+    (is (= 0           (rw @zm 0xd01a)))
+    (is (= 3           (rb @zm 0xd01c)))
+    (is (= 11          (rb @zm 0xd01d)))
+    ))
