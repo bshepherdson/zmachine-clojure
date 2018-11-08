@@ -75,7 +75,7 @@
           (bit-shift-left b 5)
           c))
 
-(defn- encode-for-dictionary [zm s]
+(defn encode-for-dictionary [zm s]
   "Given the Z-machine and a Clojure string, return the string encoded for the
   dictionary (as a sequence of words)."
   (let [encoded (encode-text s)
@@ -118,7 +118,7 @@
           (:words dict-header))))
 
 
-(defn- ->str [zm text start end]
+(defn ->str [zm text start end]
   (let [len (- end start)
         cs  (rb-width zm (+ text start) len)]
     (apply str (map char cs))))
@@ -164,33 +164,36 @@
                                    :text   (->str zm text start end)}))))))
 
 
-(defn- parse-entry [zm parse dict-header word]
+(defn- parse-entry [zm parse dict-header word soft?]
   "Given an address into the parse buffer, and the word (as a map from
   separate-words), build its entry in the parse buffer.
   Each entry consists of:
   1. the byte address of the word in the dictionary, or 0 if it's not found.
   2. the number of letters in the word (a byte)
-  3. start position (a byte)"
+  3. start position (a byte)
+  If soft? is true, unrecognized words don't write 0s."
   (let [extra-text (v4-5 zm 1 2) ; Extra byte or two for the length.
         entry      (or (lookup-word zm dict-header (:text word))
-                       0)]
+                       0)
+        zm         (if (and soft? (= 0 entry))
+                     zm ; Don't touch it, if soft and not found.
+                     (ww zm parse entry))] ; Otherwise write it.
     (-> zm
-        (ww parse entry)
         (wb (+ 2 parse) (:length word))
         (wb (+ 3 parse) (+ extra-text (:start word))))))
 
 
-(defn parse-text-dict [zm text len parse dict]
+(defn parse-text-dict [zm text len parse soft? dict]
   (let [dict-header (dictionary-header zm dict)
         words       (separate-words zm dict-header text len)
-        zm (reduce-kv #(parse-entry %1 (+ 2 (* 4 %2) parse) dict-header %3)
+        zm (reduce-kv #(parse-entry %1 (+ 2 (* 4 %2) parse) dict-header %3 soft?)
                       zm
                       words)]
     (wb zm (inc parse) (count words))))
 
 
-(defn parse-text [zm text len parse]
+(defn parse-text [zm text len parse soft?]
   "Given the text s and parse-buffer address parse, parse the text against the
   default dictionary."
-  (parse-text-dict zm text len parse (standard-dictionary zm)))
+  (parse-text-dict zm text len parse soft? (standard-dictionary zm)))
 

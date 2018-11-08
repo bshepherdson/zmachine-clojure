@@ -1,5 +1,6 @@
 (ns zm.zmachine
   (:require [zm.initialization :as ini]
+            [zm.random :as rng]
             [zm.memory :refer :all]))
 
 ;; A general pattern of the Z-machine is that functions take a state as the
@@ -23,6 +24,7 @@
             :rom story-file   ; Immutable ROM of the story file.
             :mem {}           ; Overlaid map of changed bytes.
             :frame nil        ; Topmost frame in the stack.
+            :rng (rng/mkrandom) ; RNG seeded unpredictably.
             }]
     (-> zm
         ini/init)))

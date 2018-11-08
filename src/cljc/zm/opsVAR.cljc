@@ -8,6 +8,7 @@
             [zm.status-line :as sl]
             [zm.strings :as str]
             [zm.objects :as o]
+            [zm.random :as rng]
             [zm.reading :refer [accept]]
             [zm.zmachine :refer [read-file]]
             [zm.helpers :refer :all]
@@ -49,7 +50,7 @@
                     (write-text (inc text) s)
                     (wb (+ 1 text (count s)) 0))] ; Terminator
     (if parse
-      (zp/parse-text zm s parse)
+      (zp/parse-text zm s parse false)
       zm)))
 
 (defn- read-v5 [zm args]
@@ -69,7 +70,7 @@
                     (write-text (+ 2 text) s)
                     (wb (inc text) (count s)))] ; Length in byte 1.
     (if parse
-      (zp/parse-text zm s parse)
+      (zp/parse-text zm s parse false)
       zm)))
 
 
@@ -103,6 +104,175 @@
    ; of the opcode varies substantially between the versions, so we split it
    ; here.
    (fn [zm args] ((v4-5 zm read-v4 read-v5) zm args))
+
+   ; print_char output-character-code
+   (fn [zm [ch]] (p/print (str (char ch))))
+
+   ; print_num value
+   (fn [zm [num]] (p/print (str num)))
+
+   ; random range -> result
+   ; Range positive: uniform random between 1 and range.
+   ; Range negative: seed it to the -range, return 0.
+   ; Range 0: Re-seed randomly.
+   (fn [zm [range]]
+     (cond
+       (pos? range) (zstore zm (rng/random (:rng zm) range))
+       :else (-> zm
+                 (update :rng (if (neg? range)
+                                (rng/mkrandom (- range))
+                                (rng/mkrandom)))
+                 (zstore 0))))
+
+   ; push value
+   v/zpush
+
+   ; pull (var)
+   (fn [zm [var]]
+     (let [[zm value] (v/zpop zm)]
+       (v/wvar zm var value)))
+
+   ; split_window lines
+   (fn [zm [lines]]
+     ; TODO Implement screen model and screen splitting.
+     zm)
+
+   ; set_window window
+   (fn [zm [win]]
+     ; TODO Implement screen model and screen splitting.
+     zm)
+
+   ; call_vs2 routine args... -> result
+   ; Long call, up to 7 args.
+   (fn [zm [routine & args]]
+     (zcall zm routine args true))
+
+   ; erase_window window
+   (fn [zm [win]]
+     ; TODO Implement screen model and screen splitting.
+     zm)
+
+   ; erase_line value
+   (fn [zm [value]]
+     ; TODO Implement screen model and screen splitting.
+     zm)
+
+   ; set_cursor line column
+   (fn [zm [value]]
+     ; TODO Implement screen model and screen splitting.
+     zm)
+
+   ; get_cursor array
+   (fn [zm [value]]
+     ; TODO Implement screen model and screen splitting.
+     zm)
+
+   ; set_text_style style
+   (fn [zm [style]]
+     ; TODO Implement screen model and screen splitting.
+     zm)
+
+   ; buffer_mode flag
+   (fn [zm [style]]
+     ; TODO Implement screen model and screen splitting.
+     zm)
+
+   ; output_stream number [table]
+   (fn [zm args]
+     ; TODO Implement screen model and screen splitting.
+     zm)
+
+   ; input_stream number
+   (fn [zm args]
+     ; TODO Implement screen model and screen splitting.
+     zm)
+
+   ; sound_effect number effect volume routine
+   (fn [zm args]
+     ; TODO Implement screen model and screen splitting.
+     zm)
+
+   ; read_char 1 time routine -> result
+   (fn [zm args]
+     ; TODO Implement screen model and screen splitting.
+     zm)
+
+   ; scan_table x table len form -> result ?label
+   (fn [zm [x table len & rest]]
+     (let [form (nth 0 rest 0x82)
+           words? (bit-test form 7)
+           size   (bit-and 0x7f form)]
+       (loop [cnt len
+              *t  table]
+         (if (= 0 cnt)
+           ; Not found: store 0 and branch.
+           (-> zm (zstore 0) (zbranch false))
+
+           ; Still going. Read and check.
+           (let [y ((if words? rw rb) zm *t)]
+             (if (= x y)
+               ; Matched; return its address and branch.
+               (-> zm (zstore *t) (zbranch true))
+               ; Not matched: loop
+               (recur (dec cnt) (+ *t size))))))))
+
+   ; not value -> result
+   (fn [zm [value]]
+     (zstore zm (bit-xor 0xffff value)))
+
+   ; call_vn routine args...
+   (fn [zm [routine & args]]
+     (zcall zm routine args false))
+   ; call_vn2 routine args...
+   (fn [zm [routine & args]]
+     (zcall zm routine args false))
+
+   ; tokenise text parse [dictionary [flag]]
+   ; The flag is set to soft-touch the parse fields, and not write 0s.
+   (fn [zm [text parse & rest]]
+     (let [dict (nth rest 0 nil)
+           flag (nth rest 1 false)
+           len  (rb zm (inc text))]
+       (if dict
+         (zp/parse-text-dict zm text len parse flag dict)
+         (zp/parse-text      zm text len parse flag))))
+
+   ; encode_text zscii-text length from coded-text
+   ; Encodes the raw ZSCII string at [from, from+length) in zscii-text.
+   ; coded-text points at a dictionary-sized buffer.
+   (fn [zm [text len from dest]]
+     (let [s (zp/->str zm text from (+ len from))
+           encoded (zp/encode-for-dictionary zm s)]
+       (reduce-kv #(ww %1 (+ dest (* 2 %2))
+                       %3)
+                  zm
+                  encoded)))
+
+   ; copy_table first second size
+   ; If second is 0, then size bytes of first are zeroed.
+   ; Otherwise first is copied to second, length is abs(size).
+   ; The tables can overlap; for positive size we copy to avoid corrupting first
+   ; If size is negative, we copy forwards either way.
+   (fn [zm [src dst size]]
+     (cond
+       (= 0 dst) (reduce #(wb %1 (+ src %2) 0)
+                         zm
+                         (range (Math/abs size))) ; Zero src.
+       (neg? size) (copy> src dst (- size))
+       (< src dst) (copy< src dst size)
+       :else       (copy> src dst size)))
+
+   ; print_table zscii-text width height skip
+   (fn [zm [zscii-text width & rest]]
+     (let [height (nth 0 rest 1)
+           skip   (nth 1 rest 0)]
+       ; TODO Implement screen model and screen splitting.
+       ))
+
+   ; check_arg_count arg-number
+   ; Branches if the given argument number (counting from 1) has been provided.
+   (fn [zm [arg]]
+     (zbranch zm (>= arg (get-in zm [:frame :arg-count]))))
    ])
 
 (defn run [zm opnum args] ((nth ops opnum) zm args))

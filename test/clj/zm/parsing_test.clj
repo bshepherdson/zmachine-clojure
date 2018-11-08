@@ -65,7 +65,7 @@
                      (wb 0xd00d (int \l))))
         entry (fn [n] (+ 0x4805
                          (* (dec n) 9)))]
-    (swap! zm #'sut/parse-text 0xd002 12 0xd010)
+    (swap! zm #'sut/parse-text 0xd002 12 0xd010 false)
     (is (= 3 (rb @zm 0xd011))
         "Length in words should be recorded")
     (is (= (entry 590) (rw @zm 0xd012)))

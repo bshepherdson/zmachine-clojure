@@ -86,6 +86,20 @@
   (take width (map #(rw zm %) (iterate #(+ 2 %) addr))))
 
 
+; Copying bytes
+(defn- copy [zm src dst offset]
+  (wb zm (+ dst offset) (rb zm (+ src offset))))
+
+(defn- copy-over [zm src dst rng]
+  (reduce #(copy %1 src dst %2) zm rng))
+
+(defn copy> [zm src dst size]
+  (copy-over zm src dst (range size)))
+(defn copy< [zm src dst size]
+  (copy-over zm src dst (reverse (range size))))
+
+
+
 ;; Header accessors
 (defn version [zm]         (rb zm hdr/*version))
 (defn globals [zm]         (rw zm hdr/*globals))
