@@ -4,7 +4,9 @@
                  [reagent "0.7.0"]
                  [re-frame "0.10.5"]
                  [garden "1.3.5"]
-                 [ns-tracker "0.3.1"]]
+                 [ns-tracker "0.3.1"]
+                 [com.rpl/specter "1.1.2"]
+                 ]
 
   :plugins [[lein-cljsbuild "1.1.7"]
             [lein-garden "0.2.8"]]
@@ -41,7 +43,7 @@
   :cljsbuild
   {:builds
    [{:id           "dev"
-     :source-paths ["src/cljs"]
+     :source-paths ["src/cljs" "src/cljc"]
      :figwheel     {:on-jsload "zm.core/mount-root"}
      :compiler     {:main                 zm.core
                     :output-to            "resources/public/js/compiled/app.js"
@@ -56,7 +58,7 @@
                     }}
 
     {:id           "min"
-     :source-paths ["src/cljs"]
+     :source-paths ["src/cljs" "src/cljc"]
      :compiler     {:main            zm.core
                     :output-to       "resources/public/js/compiled/app.js"
                     :optimizations   :advanced
@@ -64,7 +66,7 @@
                     :pretty-print    false}}
 
     {:id           "test"
-     :source-paths ["src/cljs" "test/cljs"]
+     :source-paths ["src/cljs" "src/cljc" "test/cljs"]
      :compiler     {:main          zm.runner
                     :output-to     "resources/public/js/compiled/test.js"
                     :output-dir    "resources/public/js/compiled/test/out"

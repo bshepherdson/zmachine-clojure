@@ -7,9 +7,10 @@
             [zm.variables :as v]
             [zm.status-line :as sl]
             [zm.strings :as str]
+            [zm.screen :as sc]
+            [zm.input :as input]
             [zm.objects :as o]
             [zm.random :as rng]
-            [zm.reading :refer [accept]]
             [zm.zmachine :refer [read-file]]
             [zm.helpers :refer :all]
             #?(:clj [zm.util :refer [v4-5]])))
@@ -43,15 +44,15 @@
     (sl/print-status-line))
   (let [text    (nth args 0 nil)
         parse   (nth args 1 nil)
-        max-len (dec (rb zm text))
-        s0      (accept max-len)
-        s       (.toLowerCase s0)
-        zm      (-> zm
-                    (write-text (inc text) s)
-                    (wb (+ 1 text (count s)) 0))] ; Terminator
-    (if parse
-      (zp/parse-text zm s parse false)
-      zm)))
+        max-len (dec (rb zm text))]
+    (input/read zm max-len
+                #(let [s       (.toLowerCase %2)
+                       zm      (-> %1
+                                   (write-text (inc text) s)
+                                   (wb (+ 1 text (count s)) 0))] ; Terminator
+                   (if parse
+                     (zp/parse-text zm s parse false)
+                     zm)))))
 
 (defn- read-v5 [zm args]
   "Performs a command read, for v5 and above.
@@ -63,16 +64,36 @@
   ; TODO Different terminating characters in v5+.
   (let [text    (nth args 0 nil)
         parse   (nth args 1 nil)
-        max-len (rb zm text)
-        s0      (accept max-len)
-        s       (.toLowerCase s0)
-        zm      (-> zm
-                    (write-text (+ 2 text) s)
-                    (wb (inc text) (count s)))] ; Length in byte 1.
-    (if parse
-      (zp/parse-text zm s parse false)
-      zm)))
+        max-len (rb zm text)]
+    (input/read zm max-len
+                #(let [s       (.toLowerCase %2)
+                       zm      (-> %1
+                                   (write-text (+ 2 text) s)
+                                   (wb (inc text) (count s)))] ; Length in byte 1.
+                   (if parse
+                     (zp/parse-text zm s parse false)
+                     zm)))))
 
+
+; Handling for output stream 3.
+(defn- push-stream-3 [zm table]
+  (let [s3 {:nest (:stream-3 zm)
+            :table table
+            :text  (+ 2 table)}]
+    (-> zm
+        (assoc :stream-3 s3)
+        (update :output-streams conj 3))))
+
+(defn- pop-stream-3 [zm]
+  "We need to write the length of the string into the first word."
+  (let [s3  (:stream-3 zm)
+        len (- (:text s3) (:table s3) 2)
+        zm  (-> zm
+                (ww (:table s3) len)
+                (assoc :stream-3 (:nest s3)))]
+    (if (:nest s3)
+      zm
+      (update zm :output-streams disj 3))))
 
 (def ops
   [; call_1s routine args... -> result
@@ -134,13 +155,11 @@
 
    ; split_window lines
    (fn [zm [lines]]
-     ; TODO Implement screen model and screen splitting.
-     zm)
+     (sc/split! zm lines))
 
    ; set_window window
    (fn [zm [win]]
-     ; TODO Implement screen model and screen splitting.
-     zm)
+     (sc/window! zm win))
 
    ; call_vs2 routine args... -> result
    ; Long call, up to 7 args.
@@ -148,54 +167,74 @@
      (zcall zm routine args true))
 
    ; erase_window window
+   ; Erase the given window.
+   ; If -1, unsplit and clear all. If -2, clear all without unsplitting.
    (fn [zm [win]]
-     ; TODO Implement screen model and screen splitting.
-     zm)
+     (case (signed win)
+       ; Clear all windows without unsplitting them.
+       -2 (-> zm
+              (sc/erase-window! sc/upper-window)
+              (sc/erase-window! sc/lower-window))
+       ; Unsplit and clear all.
+       -1 (-> zm 
+              (sc/split! 0) ; Unsplits
+              (sc/erase-window! sc/lower-window))
+
+       ; Default: just erase this one.
+       (sc/erase-window! zm win)))
 
    ; erase_line value
+   ; Value needs to be 1. Otherwise, this is a no-op.
    (fn [zm [value]]
-     ; TODO Implement screen model and screen splitting.
-     zm)
+     (if (= 1 value)
+       (sc/erase-line! zm)
+       zm))
 
    ; set_cursor line column
-   (fn [zm [value]]
-     ; TODO Implement screen model and screen splitting.
-     zm)
+   (fn [zm [l c]]
+     (sc/cursor! zm (dec l) (dec c)))
 
    ; get_cursor array
-   (fn [zm [value]]
-     ; TODO Implement screen model and screen splitting.
-     zm)
+   ; Writes the cursor row into word 0, column into word 1.
+   (fn [zm [array]]
+     (let [[r c] (-> zm :screen :cursor)]
+       (-> zm
+           (ww array       (inc r))
+           (ww (+ 2 array) (inc c)))))
+
 
    ; set_text_style style
    (fn [zm [style]]
-     ; TODO Implement screen model and screen splitting.
-     zm)
+     (sc/style! zm style))
 
    ; buffer_mode flag
-   (fn [zm [style]]
-     ; TODO Implement screen model and screen splitting.
-     zm)
+   (fn [zm [flag]] zm) ; I'm a no-op, buffering is irrelevant here.
 
    ; output_stream number [table]
+   ; There are four of these:
+   ; 1. Main text screen
+   ; 2. Unaddressable transcript
+   ; 3. Nestable, priority writing to a table of memory.
+   ; 4. Replayable script of interactions
    (fn [zm args]
-     ; TODO Implement screen model and screen splitting.
-     zm)
+     (let [number (signed (nth args 0))
+           table  (nth args 1 nil)]
+       (cond
+         (= number  3) (push-stream-3 zm table)
+         (= number -3) (pop-stream-3  zm)
+         (neg? number) (update zm :output-streams disj (- number))
+         (pos? number) (update zm :output-streams conj    number))))
+
 
    ; input_stream number
-   (fn [zm args]
-     ; TODO Implement screen model and screen splitting.
-     zm)
+   (fn [zm args] zm) ; No-op.
 
    ; sound_effect number effect volume routine
-   (fn [zm args]
-     ; TODO Implement screen model and screen splitting.
-     zm)
+   (fn [zm args] zm) ; Not implemented.
 
    ; read_char 1 time routine -> result
    (fn [zm args]
-     ; TODO Implement screen model and screen splitting.
-     zm)
+     (input/single-char zm zstore))
 
    ; scan_table x table len form -> result ?label
    (fn [zm [x table len & rest]]

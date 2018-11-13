@@ -1,5 +1,4 @@
 (ns zm.decoding
-  "High-level opcode handling that breaks down and calls a single instruction."
   (:require [zm.memory :refer :all]
             [zm.variables :as v]
             [zm.ops0OP :as ops0OP]

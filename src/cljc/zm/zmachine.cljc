@@ -25,6 +25,10 @@
             :mem {}           ; Overlaid map of changed bytes.
             :frame nil        ; Topmost frame in the stack.
             :rng (rng/mkrandom) ; RNG seeded unpredictably.
+            :output-streams #{1} ; Set of currently selected output streams.
+            :stream-3 nil        ; Data structure for the nestable stream.
+            :state :running   ; One of :running :read :read-char :quit
+                              ; The wrapping re-frame app reads these.
             }]
     (-> zm
         ini/init)))

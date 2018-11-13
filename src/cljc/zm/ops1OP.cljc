@@ -4,7 +4,7 @@
   (:require [zm.memory :refer :all]
             [zm.printing :as p]
             [zm.variables :as v]
-            [zm.strings :as str]
+            [zm.strings :as s]
             [zm.objects :as o]
             [zm.zmachine :refer [read-file]]
             [zm.helpers :refer :all]
@@ -61,7 +61,7 @@
 
    ; print_addr byte-address
    ; Prints the string at the given byte address.
-   #(p/print (str/read-ra %1 %2))
+   #(p/print (s/read-ra %1 %2))
 
    ; call_1s routine -> result
    ; Call, no arguments, store results.
@@ -73,7 +73,7 @@
 
    ; print_obj object
    ; Prints the short name of the given object.
-   #(p/print (str/read-ra %1 (o/short-name %1 (o/object %1 %2))))
+   #(p/print (s/read-ra %1 (o/short-name %1 (o/object %1 %2))))
 
    ; ret value
    ; Returns the given value.
@@ -87,7 +87,7 @@
    #(update %1 :pc + (signed %2) -2)
 
    ; print_paddr addr
-   #(p/print (str/read-ra %1 (pa-string %1 %2)))
+   #(p/print (s/read-ra %1 (pa-string %1 %2)))
 
    ; load var -> result
    ; Loads the variable whose number is given, and stores it.
